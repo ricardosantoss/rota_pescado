@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rota do Pescado · Acesso à inspeção de pescado</title>
+  <meta name="description" content="Mapa interativo do acesso da piscicultura à inspeção sanitária federal (SIF) e estadual (SIE), por tempo de viagem. Projeto Rota do Pescado.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M8 32c10-14 30-16 42-6l8-6v24l-8-6C38 48 18 46 8 32z' fill='%231f6f8b'/%3E%3Ccircle cx='44' cy='30' r='3' fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 32c10-14 30-16 42-6l8-6v24l-8-6C38 48 18 46 8 32z" fill="currentColor"/><circle cx="44" cy="30" r="3" fill="#fff"/></svg>
+      <div>
+        <h1>Acesso à inspeção de pescado</h1>
+        <p>Projeto Rota do Pescado · quanto tempo de estrada separa a piscicultura de um frigorífico inspecionado</p>
+      </div>
+    </div>
+    <div class="topo-acoes">
+      <label class="sel-estado">
+        <span>Estado</span>
+        <select id="estado" aria-label="Estado"></select>
+      </label>
+      <button class="btn-texto" id="btn-sobre" type="button">Sobre os dados</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ======================= PAINEL DE CONTROLE ======================= -->
+    <aside class="lateral" aria-label="Controles e indicadores">
+      <section class="bloco">
+        <h2>Qual inspeção?</h2>
+        <div class="seg" id="seg-camada" role="radiogroup" aria-label="Tipo de inspeção">
+          <button type="button" data-v="SIF" role="radio">Federal (SIF)</button>
+          <button type="button" data-v="SIE" role="radio">Estadual (SIE)</button>
+          <button type="button" data-v="AMBOS" role="radio">As duas</button>
+        </div>
+        <p class="ajuda" id="ajuda-camada"></p>
+      </section>
+
+      <section class="bloco">
+        <div class="linha-rotulo"><h2>Limite de viagem</h2><output id="out-T">2 h</output></div>
+        <input type="range" id="rng-T" min="0.5" max="6" step="0.5" value="2" aria-label="Limite de tempo de viagem em horas">
+        <div class="linha-rotulo">
+          <h2>Ano</h2>
+          <div class="ano-ctl"><button type="button" class="btn-ico" id="btn-play" aria-label="Animar os anos">▶</button><output id="out-ano">2025</output></div>
+        </div>
+        <input type="range" id="rng-ano" min="2015" max="2025" step="1" value="2025" aria-label="Ano">
+        <label class="linha-rotulo pequeno">
+          <span>Velocidade do caminhão</span>
+          <select id="sel-fator" aria-label="Fator de caminhão">
+            <option value="1.0">igual a um carro</option>
+            <option value="1.2" selected>20% mais lento (padrão)</option>
+            <option value="1.4">40% mais lento</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="bloco kpis" aria-live="polite">
+        <div class="kpi destaque">
+          <span class="kpi-num" id="kpi-cob">—</span>
+          <span class="kpi-rot" id="kpi-cob-rot">da produção a até 2 h de uma inspeção</span>
+          <span class="kpi-delta" id="kpi-cob-delta"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-num" id="kpi-tmed">—</span>
+          <span class="kpi-rot">tempo médio de uma tonelada até a inspeção</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-num" id="kpi-desc">—</span>
+          <span class="kpi-rot" id="kpi-desc-rot">de peixe além do limite</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-num" id="kpi-est">—</span>
+          <span class="kpi-rot">estabelecimentos na rede</span>
+        </div>
+      </section>
+
+      <section class="bloco">
+        <h2>Curva de cobertura</h2>
+        <p class="ajuda">Parte da produção do estado a até X horas de uma inspeção. A linha vertical é o limite escolhido.</p>
+        <div id="curva" class="curva" role="img" aria-label="Curva de cobertura da produção por tempo de viagem"></div>
+      </section>
+
+      <section class="bloco simulador">
+        <div class="linha-rotulo">
+          <h2>Simulador "e se"</h2>
+          <label class="interruptor"><input type="checkbox" id="chk-sim"><span>ativar</span></label>
+        </div>
+        <p class="ajuda" id="sim-ajuda">Ative e clique em municípios do mapa para instalar unidades de inspeção hipotéticas. A cobertura é recalculada na hora.</p>
+        <div class="sim-acoes">
+          <button type="button" class="btn" id="btn-sugerir">Sugerir a melhor próxima unidade</button>
+          <button type="button" class="btn-texto" id="btn-limpar">Limpar</button>
+        </div>
+        <ol id="lista-sim" class="lista-sim"></ol>
+      </section>
+    </aside>
+
+    <!-- ======================= MAPA ======================= -->
+    <section class="mapa-area">
+      <div id="mapa" aria-label="Mapa dos municípios"></div>
+      <div class="legenda" id="legenda" aria-label="Legenda"></div>
+      <div class="carregando" id="carregando">Carregando dados…</div>
+    </section>
+
+    <!-- ======================= FICHA DO MUNICÍPIO ======================= -->
+    <aside class="ficha" id="ficha" aria-label="Ficha do município" hidden>
+      <button type="button" class="fechar" id="btn-fechar" aria-label="Fechar ficha">×</button>
+      <div id="ficha-conteudo"></div>
+    </aside>
+  </main>
+
+  <!-- ======================= TABELA ======================= -->
+  <section class="tabela-area">
+    <div class="tabela-topo">
+      <h2>Municípios produtores</h2>
+      <div class="tabela-acoes">
+        <input type="search" id="busca" placeholder="Buscar município" aria-label="Buscar município">
+        <button type="button" class="btn-texto" id="btn-csv">Baixar CSV</button>
+      </div>
+    </div>
+    <div class="tabela-rolagem">
+      <table id="tabela">
+        <thead>
+          <tr>
+            <th data-k="nome">Município</th>
+            <th data-k="regiao">Região imediata</th>
+            <th data-k="prod" class="n">Produção (t)</th>
+            <th data-k="tSIF" class="n">até o SIF</th>
+            <th data-k="tSIE" class="n">até o SIE</th>
+            <th data-k="t" class="n">até a inspeção (camada)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="rodape">
+    Projeto Rota do Pescado · Dados públicos: IBGE (PPM), MAPA (SIGSIF), Agrodefesa (SIE), OpenStreetMap/OSRM ·
+    <a href="#" id="link-sobre">método e limitações</a>
+  </footer>
+
+  <dialog id="dlg-sobre" class="dialogo">
+    <form method="dialog"><button class="fechar" aria-label="Fechar">×</button></form>
+    <div id="sobre-conteudo"></div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
